@@ -3,3 +3,7 @@ Accurate timing is a crucial part of both swimming competitions and training ses
 
 
 The purpose of this project is to design and implement a modular timing system for swimming. The system will be built to provide accurate lap timing, digital tracking, and support for swimmer identification, so that personal bests and results can be stored and displayed in real time. 
+
+
+# Rough sketch
+![sketch](RoughSketch.png)
