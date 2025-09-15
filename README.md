@@ -6,4 +6,4 @@ The purpose of this project is to design and implement a modular timing system f
 
 
 # Rough sketch
-![sketch](RoughSketch.png)
+![sketch](images/RoughSketch.png)
