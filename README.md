@@ -7,3 +7,6 @@ The purpose of this project is to design and implement a modular timing system f
 
 # Rough sketch
 ![sketch](images/RoughSketch.png)
+
+# Week 4 Presentation
+https://ltuse-my.sharepoint.com/:p:/g/personal/gabsun-1_student_ltu_se/EUjiS_38GbxHo1TUgZ8F_lcByTSwbyrYnurZptee18V5dw
