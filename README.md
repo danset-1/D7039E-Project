@@ -10,3 +10,6 @@ The purpose of this project is to design and implement a modular timing system f
 
 # Week 4 Presentation
 https://ltuse-my.sharepoint.com/:p:/g/personal/gabsun-1_student_ltu_se/EUjiS_38GbxHo1TUgZ8F_lcByTSwbyrYnurZptee18V5dw
+
+# Gantt Chart
+https://ltuse-my.sharepoint.com/:x:/g/personal/gabsun-1_student_ltu_se/EYUQsI9EdhVLpdXC-OR69vYBhF8xrizb8_Dpn-aZufenOQ?email=Jan.van.Deventer%40ltu.se&e=HdQhgf
