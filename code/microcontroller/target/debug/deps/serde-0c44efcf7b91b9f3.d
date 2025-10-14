@@ -1,0 +1,14 @@
+C:\Users\danie\Desktop\test projekt sida\microcontroller\target\debug\deps\libserde-0c44efcf7b91b9f3.rmeta: C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\lib.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\integer128.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\mod.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\de.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\ser.rs C:\Users\danie\Desktop\test\ projekt\ sida\microcontroller\target\debug\build\serde-e8bd7c04eac49580\out/private.rs
+
+C:\Users\danie\Desktop\test projekt sida\microcontroller\target\debug\deps\libserde-0c44efcf7b91b9f3.rlib: C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\lib.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\integer128.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\mod.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\de.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\ser.rs C:\Users\danie\Desktop\test\ projekt\ sida\microcontroller\target\debug\build\serde-e8bd7c04eac49580\out/private.rs
+
+C:\Users\danie\Desktop\test projekt sida\microcontroller\target\debug\deps\serde-0c44efcf7b91b9f3.d: C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\lib.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\integer128.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\mod.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\de.rs C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\ser.rs C:\Users\danie\Desktop\test\ projekt\ sida\microcontroller\target\debug\build\serde-e8bd7c04eac49580\out/private.rs
+
+C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\lib.rs:
+C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\integer128.rs:
+C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\mod.rs:
+C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\de.rs:
+C:\Users\danie\.cargo\registry\src\index.crates.io-6f17d22bba15001f\serde-1.0.228\src\private\ser.rs:
+C:\Users\danie\Desktop\test\ projekt\ sida\microcontroller\target\debug\build\serde-e8bd7c04eac49580\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\Users\\danie\\Desktop\\test projekt sida\\microcontroller\\target\\debug\\build\\serde-e8bd7c04eac49580\\out
