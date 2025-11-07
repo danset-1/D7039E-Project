@@ -11,6 +11,9 @@ PORT = 5000      # Port to listen on
 pygame.mixer.init()
 pygame.mixer.music.load("music/start.mp3")
 
+PICO_IP = '10.42.0.225'
+PO = 12345
+
 class SwimTimerApp:
     def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int = 8):
         self.root = root
@@ -123,24 +126,18 @@ class SwimTimerApp:
             if len(self.laps.get(swimmer, [])) < self.max_laps:
                 self.record_lap(swimmer)
 
-    # Start the timer
-    def start(self):
-        if not self.running:
-            self.countdown(5)
-            self.running = True
-            # Start or resume: record a fresh start_time
-
     # Make a countdown before starting timer and play start sound 
     def countdown(self, count):
-            if count > 0:
-                self.timer_label.config(text=str(count))
-                # schedule next countdown step after 1 second
-                self.root.after(1000, self.countdown, count - 1)
-            else:
-                pygame.mixer.music.play()
-                self.start_time = time.time()
-                # self.running = True
-                self.update_timer()
+        if count > 0:
+            self.timer_label.config(text=str(count))
+            # schedule next countdown step after 1 second
+            self.root.after(1000, self.countdown, count - 1)
+        else:
+            start_server(handle_message)
+            pygame.mixer.music.play()
+            self.start_time = time.time()
+            # self.running = True
+            self.update_timer()
 
     # Stop the timer and all lane times
     def stop(self):
@@ -265,6 +262,17 @@ class SwimTimerApp:
         if all(len(self.laps[s]) >= self.max_laps for s in self.swimmers):
             self.stop()
 
+# Start the timer
+def start(self):
+    if not self.running:
+        data = {"command": "start"}
+        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        a.connect((PICO_IP, PO))
+        a.sendall(json.dumps(data).encode('utf-8'))
+        a.close()
+        app.running = True
+        SwimTimerApp.countdown(app, 5)
+
 def start_server(callback):
     def server_thread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -340,5 +348,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SwimTimerApp(root, swimmers, max_laps=8)
 
-    start_server(handle_message)
+    # start_server(handle_message)
     root.mainloop()
