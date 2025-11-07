@@ -5,13 +5,13 @@ import sys
 switch = Pin(15, Pin.IN, Pin.PULL_UP)
 
 class Stopwatch:
-    def __init__(self):
+    def __init__(self, start_minutes, start_seconds):
         self.start_time = time.ticks_ms()
-        self.running = True
+        self.time_offset = (start_minutes * 60 + start_seconds) * 1000
     
     def get_current_time(self):
         current_time = time.ticks_ms()
-        elapsed_ms = time.ticks_diff(current_time, self.start_time)
+        elapsed_ms = time.ticks_diff(current_time, self.start_time) + self.time_offset
         return elapsed_ms / 1000.0
     
     def format_time(self, seconds):
@@ -20,19 +20,24 @@ class Stopwatch:
         return f"{minutes:02d}:{seconds_remaining:06.3f}"
 
 def main():
-    stopwatch = Stopwatch()
-    previous_state = switch.value()
+    # Start Time
+    starttime_minutes = 0
+    starttime_seconds = 15
     
+    stopwatch = Stopwatch(start_minutes=starttime_minutes, start_seconds=starttime_seconds)
+    previous_state = switch.value()
     activated = False
     
-    print("Timer start")
+    # Initial time is set to the given time
+    initial_time = starttime_minutes * 60 + starttime_seconds
+    print(f"Start Time: {stopwatch.format_time(initial_time)}")
     print("------------------------------------------")
     
     try:
-        while stopwatch.running:
+        while True:
             # Update timer display
             current = stopwatch.format_time(stopwatch.get_current_time())
-            print(f"\rRunning: {current}", end='')
+            print(f"\rStopwatch: {current}", end='')
             
             # Check switch state
             current_state = switch.value()
@@ -41,7 +46,7 @@ def main():
             if previous_state == 1 and current_state == 0:
                 if not activated:
                     current_time = stopwatch.get_current_time()
-                    print(f"\nTime recorded: {stopwatch.format_time(current_time)}")
+                    print(f"\nTimestamp: {stopwatch.format_time(current_time)}")
                     activated = True
             
             # If switch is released
