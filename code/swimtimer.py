@@ -111,7 +111,7 @@ class SwimTimerApp:
 
         # Control keys
         if key == "s":          # start / resume
-            self.start()
+            start(self)
             return
         if key == "d":          # stop / pause
             self.stop()
@@ -235,9 +235,9 @@ class SwimTimerApp:
         # ignore if swimmer already reached max laps
         if len(self.laps.get(name, [])) >= self.max_laps:
             return
-
+        elapsed = float(lap)
         lap_time = float(lap) - self.total_lap_time[name]
-        # self.last_lap_elapsed[name] = elapsed
+        self.last_lap_elapsed[name] = elapsed
         self.laps[name].append(lap_time)
 
         self.total_lap_time[name] += lap_time
@@ -265,11 +265,11 @@ class SwimTimerApp:
 # Start the timer
 def start(self):
     if not self.running:
-        data = {"command": "start"}
-        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        a.connect((PICO_IP, PO))
-        a.sendall(json.dumps(data).encode('utf-8'))
-        a.close()
+        # data = {"command": "start"}
+        # a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # a.connect((PICO_IP, PO))
+        # a.sendall(json.dumps(data).encode('utf-8'))
+        # a.close()
         app.running = True
         SwimTimerApp.countdown(app, 5)
 
