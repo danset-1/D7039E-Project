@@ -64,9 +64,9 @@ def main():
                             last_press_time = current_time_seconds
                             activated = True
                         else:
-                            remaining_cooldown = delay - last_press
+                            
                     else:
-                        remaining_delay = initial_delay - start_time
+                       
             
             # If switch is released
             elif previous_state == 0 and current_state == 1:
