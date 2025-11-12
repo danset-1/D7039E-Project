@@ -4,8 +4,10 @@ import sys
 import network
 import socket
 import json
+import _thread
 
 switch = Pin(15, Pin.IN, Pin.PULL_UP)
+stopwatch_Active = False
 
 #Connect to wifi
 SSID = "swim"
@@ -38,7 +40,9 @@ class Stopwatch:
         return f"{minutes:02d}:{seconds_remaining:06.3f}"
 
 def start_program(laps):
+    global stopwatch_Active
     count = 0
+    stopwatch_Active = True
     # Start Time
     start_time_minutes = 0
     start_time_seconds = -4.85
@@ -59,7 +63,7 @@ def start_program(laps):
     print("------------------------------------------")
     
     try:
-        while int(laps) > count:
+        while int(laps) > count and stopwatch_Active == True:
             # Update timer display
             current = stopwatch.format_time(stopwatch.get_current_time())
             print(f"\rStopwatch: {current}", end='')
@@ -105,7 +109,10 @@ def start_program(laps):
             time.sleep(0.05)
             
     except KeyboardInterrupt:
+        stopwatch_Active = False
         print("\nStopped")
+    finally:
+        stopwatch_Active = False
 
 # Listen for signal from Raspberry Pi to start timer
 def main():
@@ -117,6 +124,8 @@ def main():
     s.bind((HOST, PORT))
     s.listen(1)
     print("Listening on port:", PORT)
+
+    global stopwatch_Active
 
     while True:
         s.settimeout(1)
@@ -132,27 +141,30 @@ def main():
                 conn.close()
                 continue
             msg = data.decode("utf-8")
-            print("Recieved:", msg)
+            print("\nRecieved:", msg)
 
             try:
                 command = json.loads(msg)
                 laps = command.get("laps")
                 if command.get("command") == "start":
-                    conn.close()
-                    s.close()
-                    start_program(laps)
+                    if stopwatch_Active == False:
+                        _thread.start_new_thread(start_program, (laps,))
+                    else:
+                        print("ignoring command")
+                
+                elif command.get("command") == "reset":
+                    stopwatch_Active = False
+                    print("Timer reset")
                 else:
                     print("Unknown command:", command)
             except Exception as e:
                 print("JSON Error:", e)
-
+            conn.close()
         except Exception as e:
             print("Error:", e)
-        finally:
-            break
-            # s.close()
-while True:
-    try:
-        main()
-    except Exception as e:
-        print("Error:", e)
+        except KeyboardInterrupt:
+            stopwatch_Active = False
+            print("\nStopped")
+
+main()
+        
