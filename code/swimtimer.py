@@ -164,6 +164,12 @@ class SwimTimerApp:
             row["total_label"].config(text="0.00")
             row["lap_count_label"].config(text="0")
 
+        data = {"command": "reset", "laps": ""}
+        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        a.connect((PICO_IP, PO))
+        a.sendall(json.dumps(data).encode('utf-8'))
+        a.close()
+
     # Update the timer
     def update_timer(self):
         # Always compute current elapsed and show it in the main timer.
