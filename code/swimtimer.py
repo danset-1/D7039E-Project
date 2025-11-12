@@ -12,7 +12,7 @@ pygame.mixer.init()
 pygame.mixer.music.load("music/start.mp3")
 
 PICO_IP = '10.42.0.225'
-PO = 12345
+PO = 6000
 
 class SwimTimerApp:
     def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int = 8):
@@ -133,10 +133,10 @@ class SwimTimerApp:
             # schedule next countdown step after 1 second
             self.root.after(1000, self.countdown, count - 1)
         else:
-            start_server(handle_message)
+            # start_server(handle_message)
             pygame.mixer.music.play()
             self.start_time = time.time()
-            # self.running = True
+            self.running = True
             self.update_timer()
 
     # Stop the timer and all lane times
@@ -265,12 +265,12 @@ class SwimTimerApp:
 # Start the timer
 def start(self):
     if not self.running:
-        # data = {"command": "start"}
-        # a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # a.connect((PICO_IP, PO))
-        # a.sendall(json.dumps(data).encode('utf-8'))
-        # a.close()
-        app.running = True
+        data = {"command": "start", "laps": "8"}
+        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        a.connect((PICO_IP, PO))
+        a.sendall(json.dumps(data).encode('utf-8'))
+        a.close()
+        # app.running = True
         SwimTimerApp.countdown(app, 5)
 
 def start_server(callback):
@@ -348,5 +348,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SwimTimerApp(root, swimmers, max_laps=8)
 
-    # start_server(handle_message)
+    start_server(handle_message)
     root.mainloop()
