@@ -13,6 +13,23 @@ pygame.mixer.music.load("music/start.mp3")
 
 PICO_IP = '10.42.0.225'
 PO = 6000
+pico_addr = {
+    ("10.42.0.39", 6000),
+    ("10.42.0.225", 6000)
+}
+send = threading.Event()
+
+def send_signal(addr, data):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(addr)
+
+        send.wait()
+
+        s.sendall(json.dumps(data).encode('utf-8'))
+        s.close()
+    except Exception as e:
+        print("Error: ",e)
 
 class SwimTimerApp:
     def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int = 8):
@@ -23,6 +40,7 @@ class SwimTimerApp:
 
         self.swimmers = swimmers
         self.max_laps = max_laps
+        self.send = False 
 
         # key_map maps '1','2',.. to swimmer names
         self.key_map: Dict[str, str] = {str(i + 1): name for i, name in enumerate(swimmers)}
@@ -136,7 +154,7 @@ class SwimTimerApp:
             # start_server(handle_message)
             pygame.mixer.music.play()
             self.start_time = time.time()
-            self.running = True
+            # self.running = True
             self.update_timer()
 
     # Stop the timer and all lane times
@@ -146,6 +164,16 @@ class SwimTimerApp:
             self.elapsed_before_start += time.time() - self.start_time
             self.start_time = None
             self.running = False
+
+        data = {"command": "stop"}
+        try:
+            for addr in pico_addr:
+                threading.Thread(target=send_signal, args=(addr, data)).start()
+        except Exception as e:
+            print("Error: ",e)
+
+        send.set()
+
 
     # Resets all variables, if called while the timer is running it stops and resets the timer
     def reset(self):
@@ -164,11 +192,14 @@ class SwimTimerApp:
             row["total_label"].config(text="0.00")
             row["lap_count_label"].config(text="0")
 
-        data = {"command": "reset", "laps": ""}
-        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        a.connect((PICO_IP, PO))
-        a.sendall(json.dumps(data).encode('utf-8'))
-        a.close()
+        data = {"command": "reset"}
+        try:
+            for addr in pico_addr:
+                threading.Thread(target=send_signal, args=(addr, data)).start()
+        except Exception as e:
+            print("Error: ",e)
+
+        send.set()
 
     # Update the timer
     def update_timer(self):
@@ -272,11 +303,15 @@ class SwimTimerApp:
 def start(self):
     if not self.running:
         data = {"command": "start", "laps": "8"}
-        a = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        a.connect((PICO_IP, PO))
-        a.sendall(json.dumps(data).encode('utf-8'))
-        a.close()
-        # app.running = True
+        try:
+            for addr in pico_addr:
+                threading.Thread(target=send_signal, args=(addr, data)).start()
+        except Exception as e:
+            print("Error: ",e)
+
+        send.set()
+
+        app.running = True
         SwimTimerApp.countdown(app, 5)
 
 def start_server(callback):
@@ -336,16 +371,16 @@ def handle_message(msg):
     print("Received:", msg)
     # label.config(text=f"Message: {msg}")
     id = msg.get("id")
-    m = msg.get("message")
+    cmd = msg.get("command")
     time = msg.get("lap_time")
     swimmer = app.key_map[id]
-    if m == "start":
+    if cmd == "start":
         SwimTimerApp.start(app)
-    elif m == "stop":
+    elif cmd == "stop":
         SwimTimerApp.stop(app)
-    elif m == "split":
+    elif cmd == "split":
         SwimTimerApp.record_lap(app, swimmer)
-    elif m == "lap":
+    elif cmd == "lap":
         SwimTimerApp.set_lap(app, time,  swimmer)
 
 

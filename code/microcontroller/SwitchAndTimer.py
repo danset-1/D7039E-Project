@@ -8,6 +8,7 @@ import _thread
 
 switch = Pin(15, Pin.IN, Pin.PULL_UP)
 stopwatch_Active = False
+curTime = 0
 
 #Connect to wifi
 SSID = "swim"
@@ -41,11 +42,12 @@ class Stopwatch:
 
 def start_program(laps):
     global stopwatch_Active
+    global curTime
     count = 0
     stopwatch_Active = True
     # Start Time
     start_time_minutes = 0
-    start_time_seconds = -4.85
+    start_time_seconds = 0
     
     stopwatch = Stopwatch(start_minutes=start_time_minutes, start_seconds=start_time_seconds)
     previous_state = switch.value()
@@ -66,6 +68,7 @@ def start_program(laps):
         while int(laps) > count and stopwatch_Active == True:
             # Update timer display
             current = stopwatch.format_time(stopwatch.get_current_time())
+            curTime = current
             print(f"\rStopwatch: {current}", end='')
             
             # Check switch state
@@ -82,6 +85,7 @@ def start_program(laps):
                     if start_time >= initial_delay:
                         # Check for normal delay
                         last_press = current_time_seconds - last_press_time
+                        #If it's a valid press send signal to Raspberry Pi with timestamp
                         if last_press >= delay:
                             print(f"\nTimestamp: {stopwatch.format_time(current_time_seconds)}")
                             last_press_time = current_time_seconds
@@ -92,7 +96,7 @@ def start_program(laps):
                             HOST2 = "10.42.0.1"     #Raspberry Pi IP
                             PORT2 = 5000
 
-                            data = {"id": "2", "message": "lap", "lap_time": current_time_seconds}
+                            data = {"id": "2", "command": "lap", "lap_time": current_time_seconds}
                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                             s.connect((HOST2, PORT2))
                             s.sendall(json.dumps(data).encode("utf-8"))
@@ -106,13 +110,16 @@ def start_program(laps):
             # Update state
             previous_state = current_state
             
-            time.sleep(0.05)
+            time.sleep_ms(5)
             
     except KeyboardInterrupt:
         stopwatch_Active = False
         print("\nStopped")
     finally:
         stopwatch_Active = False
+        # curTime = current
+        # print("\nSwimmer finished. Listening for next command:")        
+
 
 # Listen for signal from Raspberry Pi to start timer
 def main():
@@ -126,45 +133,54 @@ def main():
     print("Listening on port:", PORT)
 
     global stopwatch_Active
-
-    while True:
-        s.settimeout(1)
-        try:
-            conn, addr = s.accept()
-        except OSError:
-            # no incoming connection, just continue
-            continue
-        print("Connected by", addr)
-        try:
-            data = conn.recv(1024)
-            if not data:
-                conn.close()
-                continue
-            msg = data.decode("utf-8")
-            print("\nRecieved:", msg)
-
+    global curTime
+    try:
+        while True:
+            s.settimeout(1)
             try:
-                command = json.loads(msg)
-                laps = command.get("laps")
-                if command.get("command") == "start":
-                    if stopwatch_Active == False:
-                        _thread.start_new_thread(start_program, (laps,))
+                conn, addr = s.accept()
+            except OSError:
+                # no incoming connection, just continue
+                continue
+            print("\nConnected by", addr)
+            try:
+                data = conn.recv(1024)
+                if not data:
+                    conn.close()
+                    continue
+                msg = data.decode("utf-8")
+                print("\nRecieved:", msg)
+
+                try:
+                    command = json.loads(msg)
+                    laps = command.get("laps")
+                    if command.get("command") == "start":
+                        if stopwatch_Active == False:
+                            _thread.start_new_thread(start_program, (laps,))
+                        else:
+                            print("ignoring command")
+                    
+                    elif command.get("command") == "reset":
+                        stopwatch_Active = False
+                        print("Timer reset")
+                        print("\nListening on port:", PORT)
+                        
+                    elif command.get("command") == "stop":
+                        stopwatch_Active = False
+                        print("Timer stopped")
+                        print("Listening on port:", PORT)
+                        print("\n",curTime)
                     else:
-                        print("ignoring command")
-                
-                elif command.get("command") == "reset":
-                    stopwatch_Active = False
-                    print("Timer reset")
-                else:
-                    print("Unknown command:", command)
+                        print("Unknown command:", command)
+                except Exception as e:
+                    print("JSON Error:", e)
+                conn.close()
             except Exception as e:
-                print("JSON Error:", e)
-            conn.close()
-        except Exception as e:
-            print("Error:", e)
-        except KeyboardInterrupt:
-            stopwatch_Active = False
-            print("\nStopped")
+                print("Error:", e)
+    except KeyboardInterrupt:
+        stopwatch_Active = False
+        print("\nStopped")
+
 
 main()
         
