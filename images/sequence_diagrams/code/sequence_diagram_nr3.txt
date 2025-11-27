@@ -1,0 +1,72 @@
+@startuml
+skinparam BoxPadding 10
+
+actor Swimcoach
+box "Raspberry Pi"
+participant UserInterface
+participant StartupProcess
+participant ScreenConnection
+participant MicrocontrollerConnection
+participant WiFi
+participant Timer
+participant RTCsync
+participant Startsound
+participant StorageManager
+end box
+
+participant TV_Screen
+participant StartButton
+
+box "Microcontroller"
+participant RaspberrypiConnection
+participant InternalTimer
+participant Main
+end box
+
+Swimcoach -> UserInterface: SystemStartRequest
+UserInterface -> StartupProcess : SystemStartRequest
+StartupProcess -> ScreenConnection : DisplayTimetable
+ScreenConnection -> TV_Screen : DisplayTimetable
+ScreenConnection -> StartupProcess: TVScreenState
+StartupProcess -> UserInterface: SystemState
+StartupProcess -> MicrocontrollerConnection : StartWiFi
+MicrocontrollerConnection -> WiFi : StartWiFi
+Main -> InternalTimer : SetupInternalTimer
+Main -> RaspberrypiConnection : ConnectToRaspberrypi
+RaspberrypiConnection -> WiFi : ConnectToWiFi
+WiFi -> MicrocontrollerConnection: MicrocontrollerHasConnected
+MicrocontrollerConnection -> StartupProcess: MicrocontrollerHasConnected
+StartupProcess -> UserInterface : SystemState
+StartupProcess -> UserInterface: HowManyLapsQuery
+UserInterface -> Swimcoach : HowManyLapsQuery
+Swimcoach -> UserInterface : HowManyLaps
+UserInterface -> StartupProcess: HowManyLaps
+StartupProcess -> ScreenConnection: HowManyLaps
+ScreenConnection -> TV_Screen: HowManyLaps
+ScreenConnection -> StartupProcess: SystemState
+StartupProcess -> UserInterface: SystemState
+Swimcoach -> StartButton: StartTimerRequest
+StartButton -> Timer: StartTimer
+Timer -> RTCsync: StartClockSync
+RTCsync -> MicrocontrollerConnection: MicrocontrollerStartTime(time)
+MicrocontrollerConnection -> WiFi: MicrocontrollerStartTime(time)
+WiFi ->(20) RaspberrypiConnection: MicrocontrollerStartTime(time)
+RaspberrypiConnection -> InternalTimer: StartTime(time)
+RaspberrypiConnection ->(20) WiFi: SystemState
+WiFi -> MicrocontrollerConnection: SystemState
+MicrocontrollerConnection -> UserInterface : SystemState
+Timer -> TV_Screen: TimeUntilStart(time)
+Timer -> Startsound: Startsound
+ 
+
+loop currentLap != HowManyLaps
+	RaspberrypiConnection ->(20) WiFi: PlatePressed(id,time)
+	WiFi -> MicrocontrollerConnection: PlatePressed(id,time)
+MicrocontrollerConnection -> ScreenConnection: LapCompleted(id,time)
+	ScreenConnection -> TV_Screen: LapTime(id,time)
+end loop
+
+UserInterface -> Swimcoach: SaveTimesLocationQuery
+Swimcoach -> UserInterface: SaveTimesLocation
+UserInterface -> StorageManager: StoreTimes(ids, times,winner)
+@enduml
