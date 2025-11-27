@@ -6,6 +6,9 @@ import socket
 import json
 import pygame
 
+from Connection import MicrocontrollerConnection as mConn
+from Timer import timer
+
 HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 5000      # Port to listen on
 pygame.mixer.init()
@@ -19,18 +22,6 @@ pico_addr = {
 }
 send = threading.Event()
 
-def send_signal(addr, data):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(addr)
-
-        send.wait()
-
-        s.sendall(json.dumps(data).encode('utf-8'))
-        s.close()
-    except Exception as e:
-        print("Error: ",e)
-
 class SwimTimerApp:
     def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int = 8):
         self.root = root
@@ -40,7 +31,6 @@ class SwimTimerApp:
 
         self.swimmers = swimmers
         self.max_laps = max_laps
-        self.send = False 
 
         # key_map maps '1','2',.. to swimmer names
         self.key_map: Dict[str, str] = {str(i + 1): name for i, name in enumerate(swimmers)}
@@ -49,8 +39,8 @@ class SwimTimerApp:
         self.total_lap_time: Dict[str, float] = {name: 0.0 for name in swimmers}
 
         # Timer state
-        self.start_time: Optional[float] = None  # timestamp when current run started, None when stopped
-        self.elapsed_before_start: float = 0.0   # accumulated elapsed time from previous runs
+        # self.start_time: Optional[float] = None  # timestamp when current run started, None when stopped
+        # self.elapsed_before_start: float = 0.0   # accumulated elapsed time from previous runs
         self.running: bool = False
 
         # --- Timer display ---
@@ -101,25 +91,6 @@ class SwimTimerApp:
         # --- Bind keys ---
         self.root.bind("<KeyPress>", self.on_key_press)
 
-    # --------------------
-    # Time helpers
-    # --------------------
-    def _current_elapsed(self) -> float:
-        """Return total elapsed seconds (including previous runs)."""
-        if self.running and self.start_time is not None:
-            return self.elapsed_before_start + (time.time() - self.start_time)
-        return self.elapsed_before_start
-
-    @staticmethod
-    def _format_timer_display(seconds: float) -> str:
-        mins = int(seconds // 60)
-        secs = int(seconds % 60)
-        millis = int((seconds * 100) % 100)
-        return f"{mins:02d}:{secs:02d}.{millis:02d}"
-
-    @staticmethod
-    def _format_seconds(seconds: float) -> str:
-        return f"{seconds:5.2f}"
 
     # --------------------
     # Event handlers
@@ -129,7 +100,7 @@ class SwimTimerApp:
 
         # Control keys
         if key == "s":          # start / resume
-            start(self)
+            self.start()
             return
         if key == "d":          # stop / pause
             self.stop()
@@ -144,6 +115,21 @@ class SwimTimerApp:
             if len(self.laps.get(swimmer, [])) < self.max_laps:
                 self.record_lap(swimmer)
 
+    # Start the timer
+    def start(self):
+        if not self.running:
+            data = {"command": "start", "laps": "8"}
+            try:
+                for addr in pico_addr:
+                    threading.Thread(target=mConn.sendData, args=(addr, data)).start()
+            except Exception as e:
+                print("Error: ",e)
+
+            # send.set()
+
+            self.running = True
+            SwimTimerApp.countdown(self, 5)
+
     # Make a countdown before starting timer and play start sound 
     def countdown(self, count):
         if count > 0:
@@ -153,33 +139,33 @@ class SwimTimerApp:
         else:
             # start_server(handle_message)
             pygame.mixer.music.play()
-            self.start_time = time.time()
+            timer.start_time = time.time()
             # self.running = True
             self.update_timer()
 
     # Stop the timer and all lane times
     def stop(self):
-        if self.running and self.start_time is not None:
+        if self.running and timer.start_time is not None:
             # Accumulate elapsed time and mark stopped
-            self.elapsed_before_start += time.time() - self.start_time
-            self.start_time = None
+            timer.elapsed_before_start += time.time() - timer.start_time
+            timer.start_time = None
             self.running = False
 
         data = {"command": "stop"}
         try:
             for addr in pico_addr:
-                threading.Thread(target=send_signal, args=(addr, data)).start()
+                threading.Thread(target=mConn.sendData, args=(addr, data)).start()
         except Exception as e:
             print("Error: ",e)
 
-        send.set()
+        # send.set()
 
 
     # Resets all variables, if called while the timer is running it stops and resets the timer
     def reset(self):
         self.running = False
-        self.start_time = None
-        self.elapsed_before_start = 0.0
+        timer.start_time = None
+        timer.elapsed_before_start = 0.0
         self.timer_label.config(text="00:00.00")
         for name in self.swimmers:
             self.laps[name] = []
@@ -195,18 +181,18 @@ class SwimTimerApp:
         data = {"command": "reset"}
         try:
             for addr in pico_addr:
-                threading.Thread(target=send_signal, args=(addr, data)).start()
+                threading.Thread(target=mConn.sendData, args=(addr, data)).start()
         except Exception as e:
             print("Error: ",e)
 
-        send.set()
+        # send.set()
 
     # Update the timer
     def update_timer(self):
         # Always compute current elapsed and show it in the main timer.
         # Per-lane "Total Time" will use the same value/format so they match.
-        elapsed = self._current_elapsed()
-        self.timer_label.config(text=self._format_timer_display(elapsed))
+        elapsed = timer._current_elapsed(self)
+        self.timer_label.config(text=timer._format_timer_display(elapsed))
 
         # Update per-swimmer timers (both while running and when stopped)
         for name in self.swimmers:
@@ -214,12 +200,12 @@ class SwimTimerApp:
             row = self.row_widgets[name]
             if len(laps) < self.max_laps:
                 current_lap_time = elapsed - self.last_lap_elapsed[name]
-                row["current_lap_label"].config(text=self._format_seconds(current_lap_time))
+                row["current_lap_label"].config(text=timer._format_seconds(current_lap_time))
                 # Use same format/value as the main timer so they match visually
-                row["total_label"].config(text=self._format_timer_display(elapsed))
+                row["total_label"].config(text=timer._format_timer_display(elapsed))
             else:
                 row["current_lap_label"].config(text="DONE")
-                row["total_label"].config(text=self._format_timer_display(self.total_lap_time[name]))
+                row["total_label"].config(text=timer._format_timer_display(self.total_lap_time[name]))
 
         # Continue updating repeatedly only when running
         # Update every 0.05s 
@@ -235,7 +221,7 @@ class SwimTimerApp:
         if len(self.laps.get(name, [])) >= self.max_laps:
             return
 
-        elapsed = self._current_elapsed()
+        elapsed = timer._current_elapsed(self)
         lap_time = elapsed - self.last_lap_elapsed[name]
         self.last_lap_elapsed[name] = elapsed
         self.laps[name].append(lap_time)
@@ -246,11 +232,11 @@ class SwimTimerApp:
         # Update labels
         row = self.row_widgets[name]
         row["lap_count_label"].config(text=str(len(self.laps[name])))
-        row["latest_lap_label"].config(text=self._format_seconds(lap_time))
+        row["latest_lap_label"].config(text=timer._format_seconds(lap_time))
         best = min(self.laps[name]) if self.laps[name] else None
         if best is not None:
             best_idx = self.laps[name].index(best) + 1  # first occurrence → lap number (1-based)
-            row["best_lap_label"].config(text=f"{self._format_seconds(best)} (#{best_idx})")
+            row["best_lap_label"].config(text=f"{timer._format_seconds(best)} (#{best_idx})")
         else:
             row["best_lap_label"].config(text="-")
 
@@ -282,11 +268,11 @@ class SwimTimerApp:
         # Update labels
         row = self.row_widgets[name]
         row["lap_count_label"].config(text=str(len(self.laps[name])))
-        row["latest_lap_label"].config(text=self._format_seconds(lap_time))
+        row["latest_lap_label"].config(text=timer._format_seconds(lap_time))
         best = min(self.laps[name]) if self.laps[name] else None
         if best is not None:
             best_idx = self.laps[name].index(best) + 1  # first occurrence → lap number (1-based)
-            row["best_lap_label"].config(text=f"{self._format_seconds(best)} (#{best_idx})")
+            row["best_lap_label"].config(text=f"{timer._format_seconds(best)} (#{best_idx})")
         else:
             row["best_lap_label"].config(text="-")
 
@@ -299,95 +285,13 @@ class SwimTimerApp:
         if all(len(self.laps[s]) >= self.max_laps for s in self.swimmers):
             self.stop()
 
-# Start the timer
-def start(self):
-    if not self.running:
-        data = {"command": "start", "laps": "8"}
-        try:
-            for addr in pico_addr:
-                threading.Thread(target=send_signal, args=(addr, data)).start()
-        except Exception as e:
-            print("Error: ",e)
-
-        send.set()
-
-        app.running = True
-        SwimTimerApp.countdown(app, 5)
-
-def start_server(callback):
-    def server_thread():
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((HOST, PORT))
-            s.listen()
-            print(f"Listening on port {PORT}...")
-            while True:
-                conn, addr = s.accept()
-                print(f"Connected by {addr}")
-                threading.Thread(target=handle_client, args=(conn, callback), daemon=True).start()
-
-    threading.Thread(target=server_thread, daemon=True).start()
-
-# Handle signals that comes in, can handle rust and python
-def handle_client(conn, callback):
-    with conn:
-        buffer = b""
-        while True:
-            chunk = conn.recv(1024)
-            if not chunk:
-                break
-            buffer += chunk
-
-            while True:
-                if len(buffer) == 0:
-                    break
-
-                # --- Case 1: Length-prefixed (Rust) ---
-                if len(buffer) >= 4:
-                    length = int.from_bytes(buffer[:4], "big")
-
-                    if 1 <= length <= 10_000 and len(buffer) >= 4 + length:
-                        json_bytes = buffer[4:4 + length]
-                        buffer = buffer[4 + length:]
-                        try:
-                            msg = json.loads(json_bytes.decode("utf-8"))
-                            callback(msg)
-                        except json.JSONDecodeError:
-                            print("Invalid JSON (Rust format)")
-                        continue
-
-                # --- Case 2: Plain JSON (Python) ---
-                try:
-                    msg = json.loads(buffer.decode("utf-8"))
-                    buffer = b""  # fully consumed
-                    callback(msg)
-                except json.JSONDecodeError:
-                    # Wait for more data
-                    break
-
-    print("Client disconnected.")
-
-# Take the data from the signal and call action based on the data
-def handle_message(msg):
-    print("Received:", msg)
-    # label.config(text=f"Message: {msg}")
-    id = msg.get("id")
-    cmd = msg.get("command")
-    time = msg.get("lap_time")
-    swimmer = app.key_map[id]
-    if cmd == "start":
-        SwimTimerApp.start(app)
-    elif cmd == "stop":
-        SwimTimerApp.stop(app)
-    elif cmd == "split":
-        SwimTimerApp.record_lap(app, swimmer)
-    elif cmd == "lap":
-        SwimTimerApp.set_lap(app, time,  swimmer)
 
 
-if __name__ == "__main__":
-    swimmers = [f"Lane {i}" for i in range(1, 5)] # change to ID swimmers
-    root = tk.Tk()
-    app = SwimTimerApp(root, swimmers, max_laps=8)
 
-    start_server(handle_message)
-    root.mainloop()
+# if __name__ == "__main__":
+#     swimmers = [f"Lane {i}" for i in range(1, 5)] # change to ID swimmers
+#     root = tk.Tk()
+#     app = SwimTimerApp(root, swimmers, max_laps=8)
+
+#     mConn.start_server(mConn.handle_message, app)
+#     root.mainloop()
