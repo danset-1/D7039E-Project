@@ -1,6 +1,3 @@
-# swim_timer_with_settings.py
-# Single-file Swim Timer with a Settings window (live UI rebuild) and persistent config.
-
 import tkinter as tk
 import time
 from typing import Dict, List, Optional
@@ -8,16 +5,12 @@ import threading
 import socket
 import json
 import pygame
-import sys
-import os
 
 from Connection import MicrocontrollerConnection as mConn
 from Timer import timer
 
-HOST = '0.0.0.0'  # Listen on all interfaces
-PORT = 5000      # Port to listen on
-pygame.mixer.init()
-pygame.mixer.music.load("music/start.mp3")
+# ---------- Config ----------
+CONFIG_PATH = "screen/config.json"
 
 def load_config():
     try:
@@ -31,24 +24,17 @@ def save_config(cfg):
         json.dump(cfg, f)
 
 # ---------- Networking & Audio ----------
-HOST = '0.0.0.0'
-PORT = 5000
+HOST = '0.0.0.0'  # Listen on all interfaces
+PORT = 5000      # Port to listen on
+pygame.mixer.init()
+pygame.mixer.music.load("music/start.mp3")
 
-# Try to init pygame only if available
-try:
-    pygame.mixer.init()
-    pygame.mixer.music.load("music/start.mp3")
-    PYGAME_OK = True
-except Exception as e:
-    print("Warning: pygame audio not available:", e)
-    PYGAME_OK = False
-
-# Example pico addresses (unchanged from your original)
+PICO_IP = '10.42.0.225'
+PO = 6000
 pico_addr = {
     ("10.42.0.39", 6000),
     ("10.42.0.225", 6000)
 }
-
 send = threading.Event()
 
 class SwimTimerApp:
@@ -58,8 +44,8 @@ class SwimTimerApp:
         self.root.geometry("1300x650")
         self.root.config(bg="#ebe8e1")
 
-        self.swimmers = swimmers
-        self.max_laps = max_laps
+        # Escape button to exit fullscreen
+        self.root.bind("<Escape>", lambda event: self.root.attributes("-fullscreen", False))
 
         # Core data
         self.swimmers = swimmers[:]  # list of swimmer names (Lane 1..N)
@@ -72,8 +58,8 @@ class SwimTimerApp:
         self.total_lap_time: Dict[str, float] = {}
 
         # Timer state
-        # self.start_time: Optional[float] = None  # timestamp when current run started, None when stopped
-        # self.elapsed_before_start: float = 0.0   # accumulated elapsed time from previous runs
+        self.start_time: Optional[float] = None
+        self.elapsed_before_start: float = 0.0
         self.running: bool = False
 
         # Top timer label
@@ -110,9 +96,6 @@ class SwimTimerApp:
         # Key bindings
         self.root.bind("<KeyPress>", self.on_key_press)
 
-    # -----------------------
-    # Internal helpers
-    # -----------------------
     def _init_swimmer_data_structures(self):
         """Ensure data structures exist for current self.swimmers."""
         for name in self.swimmers:
@@ -128,15 +111,6 @@ class SwimTimerApp:
 
         # key_map maps numeric keys (1..N) to swimmer names
         self.key_map = {str(i + 1): name for i, name in enumerate(self.swimmers)}
-
-    def _format_timer_display(self, seconds: float) -> str:
-        mins = int(seconds // 60)
-        secs = int(seconds % 60)
-        millis = int((seconds * 100) % 100)
-        return f"{mins:02d}:{secs:02d}.{millis:02d}"
-
-    def _format_seconds(self, seconds: float) -> str:
-        return f"{seconds:5.2f}"
 
     # -----------------------
     # UI: (re)build table
@@ -192,10 +166,73 @@ class SwimTimerApp:
         win.transient(self.root)
         win.grab_set()
 
+        tk.Label(win, text="Number of swimmers:", bg="#ebe8e1", font=("Arial", 14)).pack(pady=(12,6))
+        swimmer_entry = tk.Entry(win, font=("Arial", 14), justify="center")
+        swimmer_entry.insert(0, str(len(self.swimmers)))
+        swimmer_entry.pack(pady=4)
 
-            self.running = True
-            # do a short countdown (5s)
-            self.countdown(5)
+        tk.Label(win, text="Number of laps:", bg="#ebe8e1", font=("Arial", 14)).pack(pady=(12,6))
+        laps_entry = tk.Entry(win, font=("Arial", 14), justify="center")
+        laps_entry.insert(0, str(self.max_laps))
+        laps_entry.pack(pady=4)
+
+        hint = tk.Label(win, text="(Min 1, Max 10 swimmers)", bg="#ebe8e1", font=("Arial", 10))
+        hint.pack(pady=(6,0))
+
+        def apply_settings():
+            try:
+                new_swimmers = int(swimmer_entry.get())
+                new_laps = int(laps_entry.get())
+                if new_swimmers < 1 or new_swimmers > 10:
+                    return
+                if new_laps < 1:
+                    return
+
+                # Save config persistently
+                save_config({"swimmers": new_swimmers, "laps": new_laps})
+
+                # Apply new settings live (preserve as much state as reasonably possible)
+                self.apply_new_settings(new_swimmers, new_laps)
+
+                win.destroy()
+            except ValueError:
+                # ignore invalid input
+                return
+
+        tk.Button(win, text="Apply", font=("Arial", 14), command=apply_settings).pack(pady=16)
+
+    def apply_new_settings(self, num_swimmers: int, num_laps: int):
+        """
+        Apply new settings live: rebuild swimmer list and UI.
+        We'll stop the timer and reset per-swimmer lap state for a clean start.
+        """
+        # Stop timer and reset time keeping
+        self.running = False
+        self.start_time = None
+        self.elapsed_before_start = 0.0
+
+        # Build new swimmer names
+        new_swimmers = [f"Lane {i}" for i in range(1, num_swimmers + 1)]
+        self.swimmers = new_swimmers
+        self.max_laps = num_laps
+
+        # Reinitialize data structures for each swimmer (fresh)
+        self.laps = {name: [] for name in self.swimmers}
+        self.last_lap_elapsed = {name: 0.0 for name in self.swimmers}
+        self.total_lap_time = {name: 0.0 for name in self.swimmers}
+        self._init_swimmer_data_structures()
+
+        # Recreate table UI
+        self._create_table()
+
+        # Reset main timer label
+        self.timer_label.config(text="00:00.00")
+
+    # --------------------
+    # Event handlers
+    # --------------------
+    def on_key_press(self, event):
+        key = (event.char or "").lower()
 
         # Control keys
         if key == "s":          # start / resume
@@ -233,6 +270,7 @@ class SwimTimerApp:
     def countdown(self, count):
         if count > 0:
             self.timer_label.config(text=str(count))
+            # schedule next countdown step after 1 second
             self.root.after(1000, self.countdown, count - 1)
         else:
             # start_server(handle_message)
@@ -241,6 +279,7 @@ class SwimTimerApp:
             # self.running = True
             self.update_timer()
 
+    # Stop the timer and all lane times
     def stop(self):
         if self.running and timer.start_time is not None:
             # Accumulate elapsed time and mark stopped
@@ -257,24 +296,23 @@ class SwimTimerApp:
 
         # send.set()
 
+
+    # Resets all variables, if called while the timer is running it stops and resets the timer
     def reset(self):
         self.running = False
         timer.start_time = None
         timer.elapsed_before_start = 0.0
         self.timer_label.config(text="00:00.00")
-
-        # reset swimmers' lap data & UI
         for name in self.swimmers:
             self.laps[name] = []
             self.last_lap_elapsed[name] = 0.0
             self.total_lap_time[name] = 0.0
-            row = self.row_widgets.get(name)
-            if row:
-                row["current_lap_label"].config(text="0.00")
-                row["best_lap_label"].config(text="-")
-                row["latest_lap_label"].config(text="-")
-                row["total_label"].config(text="0.00")
-                row["lap_count_label"].config(text="0")
+            row = self.row_widgets[name]
+            row["current_lap_label"].config(text="0.00")
+            row["best_lap_label"].config(text="-")
+            row["latest_lap_label"].config(text="-")
+            row["total_label"].config(text="0.00")
+            row["lap_count_label"].config(text="0")
 
         data = {"command": "reset"}
         try:
@@ -285,18 +323,17 @@ class SwimTimerApp:
 
         # send.set()
 
+    # Update the timer
     def update_timer(self):
         # Always compute current elapsed and show it in the main timer.
         # Per-lane "Total Time" will use the same value/format so they match.
         elapsed = timer._current_elapsed(self)
         self.timer_label.config(text=timer._format_timer_display(elapsed))
 
+        # Update per-swimmer timers (both while running and when stopped)
         for name in self.swimmers:
-            laps = self.laps.get(name, [])
-            row = self.row_widgets.get(name)
-            if not row:
-                continue
-
+            laps = self.laps[name]
+            row = self.row_widgets[name]
             if len(laps) < self.max_laps:
                 current_lap_time = elapsed - self.last_lap_elapsed[name]
                 row["current_lap_label"].config(text=timer._format_seconds(current_lap_time))
@@ -306,15 +343,17 @@ class SwimTimerApp:
                 row["current_lap_label"].config(text="DONE")
                 row["total_label"].config(text=timer._format_timer_display(self.total_lap_time[name]))
 
+        # Continue updating repeatedly only when running
+        # Update every 0.05s 
         if self.running:
             self.root.after(50, self.update_timer)
 
-    # -----------------------
-    # Lap recording
-    # -----------------------
+    # Record a lap time for a swimmer
     def record_lap(self, name: str):
         if not self.running:
-            return
+            return  # ignore lap presses when timer is not running
+
+        # ignore if swimmer already reached max laps
         if len(self.laps.get(name, [])) >= self.max_laps:
             return
 
@@ -322,19 +361,9 @@ class SwimTimerApp:
         lap_time = elapsed - self.last_lap_elapsed[name]
         self.last_lap_elapsed[name] = elapsed
         self.laps[name].append(lap_time)
-        self.total_lap_time[name] = self.total_lap_time.get(name, 0.0) + lap_time
 
-        row = self.row_widgets.get(name)
-        if row:
-            row["lap_count_label"].config(text=str(len(self.laps[name])))
-            row["latest_lap_label"].config(text=self._format_seconds(lap_time))
-            best = min(self.laps[name]) if self.laps[name] else None
-            if best is not None:
-                best_idx = self.laps[name].index(best) + 1
-                row["best_lap_label"].config(text=f"{self._format_seconds(best)} (#{best_idx})")
+        self.total_lap_time[name] += lap_time
 
-            if len(self.laps[name]) >= self.max_laps:
-                row["current_lap_label"].config(text="DONE")
 
         # Update labels
         row = self.row_widgets[name]
@@ -355,31 +384,22 @@ class SwimTimerApp:
         # If every swimmer has finished, stop main timer
         if all(len(self.laps[s]) >= self.max_laps for s in self.swimmers):
             self.stop()
-
-    def set_lap(self, lap: str, name: str):
-        """
-        External lap set (from network): lap is elapsed time (float or string)
-        Behavior kept similar to original code.
-        """
+    
+    # Record a lap from an external time input
+    def set_lap(self, lap: str,  name: str):
+        # time = float(lap)
         if not self.running:
-            return
+            return  # ignore lap presses when timer is not running
+
+        # ignore if swimmer already reached max laps
         if len(self.laps.get(name, [])) >= self.max_laps:
             return
-
         elapsed = float(lap)
-        lap_time = elapsed - self.total_lap_time.get(name, 0.0)
+        lap_time = float(lap) - self.total_lap_time[name]
         self.last_lap_elapsed[name] = elapsed
         self.laps[name].append(lap_time)
-        self.total_lap_time[name] = self.total_lap_time.get(name, 0.0) + lap_time
 
-        row = self.row_widgets.get(name)
-        if row:
-            row["lap_count_label"].config(text=str(len(self.laps[name])))
-            row["latest_lap_label"].config(text=self._format_seconds(lap_time))
-            best = min(self.laps[name]) if self.laps[name] else None
-            if best is not None:
-                best_idx = self.laps[name].index(best) + 1
-                row["best_lap_label"].config(text=f"{self._format_seconds(best)} (#{best_idx})")
+        self.total_lap_time[name] += lap_time
 
         # Update labels
         row = self.row_widgets[name]
@@ -392,6 +412,12 @@ class SwimTimerApp:
         else:
             row["best_lap_label"].config(text="-")
 
+        # Stop swimmer after reaching max laps
+        if len(self.laps[name]) >= self.max_laps:
+            
+            row["current_lap_label"].config(text="DONE")
+
+        # If every swimmer has finished, stop main timer
         if all(len(self.laps[s]) >= self.max_laps for s in self.swimmers):
             self.stop()
 
