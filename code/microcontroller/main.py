@@ -6,13 +6,18 @@ import socket
 import json
 import _thread
 
-
+#Set pin 15 as PULL UP
 switch = Pin(15, Pin.IN, Pin.PULL_UP)
 stopwatch_Active = False
+
+#Set Current time to 0
 curTime = 0
+
+#Turn LED on when powered
 led = machine.Pin("LED", machine.Pin.OUT)
-led.on()
-#Connect to wifi
+led.off()
+
+#Connect to WiFi
 SSID = "swim"
 PASSWORD = "12345678"
 
@@ -26,7 +31,10 @@ print("Connecting to wifi...")
 while not wlan.isconnected():
     time.sleep(0.5)
 print("Connected:", wlan.ifconfig())
+#LED on when connected to WiFi
+led.on()
 
+# Start stopwatch on microcontroller
 class Stopwatch:
     def __init__(self, start_minutes, start_seconds):
         self.start_time = time.ticks_ms()
@@ -50,7 +58,7 @@ def start_program(laps):
     # Start Time
     start_time_minutes = 0
     start_time_seconds = 0
-    
+    # Sets start time to the set minutes and seconds
     stopwatch = Stopwatch(start_minutes=start_time_minutes, start_seconds=start_time_seconds)
     previous_state = switch.value()
     activated = False
@@ -118,9 +126,7 @@ def start_program(laps):
         stopwatch_Active = False
         print("\nStopped")
     finally:
-        stopwatch_Active = False
-        # curTime = current
-        # print("\nSwimmer finished. Listening for next command:")        
+        stopwatch_Active = False    
 
 
 # Listen for signal from Raspberry Pi to start timer
@@ -186,3 +192,4 @@ def main():
 
 main()
         
+
