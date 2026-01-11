@@ -3,29 +3,28 @@ import socket
 import json
 from Screen import app as tk
 
+# Variables for where server listens for signals
 HOST = '0.0.0.0'
 PORT = 5000
 
-PICO_IP = '10.42.0.225'
-PO = 6000
+# IP's and ports to send signal to microcontrollers
 pico_addr = {
     ("10.42.0.39", 6000),
     ("10.42.0.225", 6000)
 }
-send = threading.Event()
 
+# Sends a signal to "addr" with data from "data"
 def sendData(addr, data):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(addr)
-
-        # send.wait()
 
         s.sendall(json.dumps(data).encode('utf-8'))
         s.close()
     except Exception as e:
         print("Error: ",e)
 
+# Starts to listen for signals on a port
 def start_server(callback, app):
     def server_thread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -40,6 +39,7 @@ def start_server(callback, app):
     threading.Thread(target=server_thread, daemon=True).start()
 
 # Handle signals that comes in, can handle rust and python
+# When a signal is sent to hosts IP if there is valid JSON data with the signal send to handle_message function
 def receiveData(conn, callback, app):
     with conn:
         buffer = b""
@@ -78,14 +78,18 @@ def receiveData(conn, callback, app):
 
     print("Client disconnected.")
 
-# Take the data from the signal and call action based on the data
+# Take the JSON data receieved from the signal and call action based on the data
 def handle_message(msg, app):
     print("Received:", msg)
-    # label.config(text=f"Message: {msg}")
+
+    # Example of JSON data: "{"id": "2", "message": "lap", "lap_time": "59.2"}"
+    # Split JSON data into variables
     id = msg.get("id")
     cmd = msg.get("command")
     time = msg.get("lap_time")
     swimmer = app.key_map[id]
+
+    # Based on what the command("cmd") is call the appropriate action in the app
     if cmd == "start":
         tk.SwimTimerApp.start(app)
     elif cmd == "stop":

@@ -10,8 +10,10 @@ from Connection import MicrocontrollerConnection as mConn
 from Timer import timer
 
 # ---------- Config ----------
+# Stores how many swimming lanes there are and how many laps the swimmers are going to do
 CONFIG_PATH = "screen/config.json"
 
+# Opens the config.json file and reads the stored values and sets the app to use those values
 def load_config():
     try:
         with open(CONFIG_PATH, "r") as f:
@@ -19,6 +21,7 @@ def load_config():
     except Exception:
         return {"swimmers": 4, "laps": 8}
 
+# If the values for swimming lanes and or number of laps are changed save the new values to the config.json file
 def save_config(cfg):
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f)
@@ -26,8 +29,6 @@ def save_config(cfg):
 # ---------- Networking & Audio ----------
 HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 5000      # Port to listen on
-pygame.mixer.init()
-pygame.mixer.music.load("music/start.mp3")
 
 PICO_IP = '10.42.0.225'
 PO = 6000
@@ -35,10 +36,13 @@ pico_addr = {
     ("10.42.0.39", 6000),
     ("10.42.0.225", 6000)
 }
-send = threading.Event()
+
+# Initialize being able to play a sound and load the sound file
+pygame.mixer.init()
+pygame.mixer.music.load("music/start.mp3")      # Load gun sound
 
 class SwimTimerApp:
-    def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int = 8):
+    def __init__(self, root: tk.Tk, swimmers: List[str], max_laps: int):
         self.root = root
         self.root.title("Swim Timer")
         self.root.geometry("1300x650")
@@ -50,6 +54,7 @@ class SwimTimerApp:
         # Core data
         self.swimmers = swimmers[:]  # list of swimmer names (Lane 1..N)
         self.max_laps = max_laps
+        print(self.max_laps)
 
         # per-swimmer runtime data
         self.key_map: Dict[str, str] = {}  # maps "1","2"... -> swimmer name
@@ -254,14 +259,12 @@ class SwimTimerApp:
     # Start the timer
     def start(self):
         if not self.running:
-            data = {"command": "start", "laps": "8"}
+            data = {"command": "start", "laps": self.max_laps}
             try:
                 for addr in pico_addr:
                     threading.Thread(target=mConn.sendData, args=(addr, data)).start()
             except Exception as e:
                 print("Error: ",e)
-
-            # send.set()
 
             self.running = True
             SwimTimerApp.countdown(self, 5)
@@ -273,7 +276,6 @@ class SwimTimerApp:
             # schedule next countdown step after 1 second
             self.root.after(1000, self.countdown, count - 1)
         else:
-            # start_server(handle_message)
             pygame.mixer.music.play()
             timer.start_time = time.time()
             # self.running = True
@@ -294,8 +296,6 @@ class SwimTimerApp:
         except Exception as e:
             print("Error: ",e)
 
-        # send.set()
-
 
     # Resets all variables, if called while the timer is running it stops and resets the timer
     def reset(self):
@@ -314,14 +314,14 @@ class SwimTimerApp:
             row["total_label"].config(text="0.00")
             row["lap_count_label"].config(text="0")
 
-        data = {"command": "reset"}
+        # Call function to send a signal
+        data = {"command": "reset"}     # Data to send with the signal
         try:
             for addr in pico_addr:
                 threading.Thread(target=mConn.sendData, args=(addr, data)).start()
         except Exception as e:
             print("Error: ",e)
 
-        # send.set()
 
     # Update the timer
     def update_timer(self):
@@ -348,7 +348,7 @@ class SwimTimerApp:
         if self.running:
             self.root.after(50, self.update_timer)
 
-    # Record a lap time for a swimmer
+    # Record a lap time for a swimmer, is used when timesplit is called from keyboard input
     def record_lap(self, name: str):
         if not self.running:
             return  # ignore lap presses when timer is not running
@@ -387,7 +387,6 @@ class SwimTimerApp:
     
     # Record a lap from an external time input
     def set_lap(self, lap: str,  name: str):
-        # time = float(lap)
         if not self.running:
             return  # ignore lap presses when timer is not running
 
