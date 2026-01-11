@@ -129,11 +129,11 @@ def start_program(laps):
         stopwatch_Active = False    
 
 
-# Listen for signal from Raspberry Pi to start timer
+# Listen for signal from Raspberry Pi to start program and executing commands
 def main():
     HOST = '0.0.0.0'
     PORT = 6000
-
+    # Begin listening on port for signals
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT))
@@ -143,6 +143,7 @@ def main():
     global stopwatch_Active
     global curTime
     try:
+        # Check for a signal continuously
         while True:
             s.settimeout(1)
             try:
@@ -151,6 +152,7 @@ def main():
                 # no incoming connection, just continue
                 continue
             print("\nConnected by", addr)
+            # Check if there is data with the signal and decode it
             try:
                 data = conn.recv(1024)
                 if not data:
@@ -158,26 +160,32 @@ def main():
                     continue
                 msg = data.decode("utf-8")
                 print("\nRecieved:", msg)
-
+                # Based on what was recevied do different actions, Starting/Stopping/Reseting the race/timer
                 try:
                     command = json.loads(msg)
                     laps = command.get("laps")
+                    # If it's a start command create a thread that runs start_program function with amount of laps from signal
                     if command.get("command") == "start":
                         if stopwatch_Active == False:
                             _thread.start_new_thread(start_program, (laps,))
+                        # If a new start command is received while a timer/race is still active ignore it
                         else:
                             print("ignoring command")
-                    
+
+                    # Resets the timer/race and listens for a new signal
                     elif command.get("command") == "reset":
-                        stopwatch_Active = False
+                        stopwatch_Active = False    # Stops the thread that is running start_program function
                         print("Timer reset")
                         print("\nListening on port:", PORT)
-                        
+
+                    # Stops the timer and listens for new signal
                     elif command.get("command") == "stop":
                         stopwatch_Active = False
                         print("Timer stopped")
                         print("Listening on port:", PORT)
                         print("\n",curTime)
+                    
+                    # Unknow command if anything else
                     else:
                         print("Unknown command:", command)
                 except Exception as e:
@@ -189,7 +197,7 @@ def main():
         stopwatch_Active = False
         print("\nStopped")
 
-
+# Starts the code
 main()
         
 

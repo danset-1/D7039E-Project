@@ -1,2 +1,2 @@
-# This folder has code to be able to ping the raspberry pi
-with signal_tkinter.py and src/main.rs being able to connect to the python swimtimer.py.
+# Microcontroller code
+Code that runs on the microcontroller, the code auto runs on the Raspberry Pi Pico 2 W
